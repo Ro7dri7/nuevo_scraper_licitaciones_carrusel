@@ -1,18 +1,30 @@
-# 1. Usamos la imagen oficial de Playwright que ya tiene Python y los navegadores instalados
-FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
+# 1. Usamos una imagen base ligera de Python
+FROM python:3.11-slim-bookworm
 
-# 2. Establecemos el directorio de trabajo dentro del contenedor
+# 2. Establecemos variables de entorno para evitar archivos temporales y asegurar la salida de logs
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# 3. Instalamos dependencias básicas del sistema necesarias para descargar navegadores
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    gnupg \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-# 3. Copiamos el archivo de dependencias
+# 4. Copiamos e instalamos las librerías de Python primero
 COPY requirements.txt .
-
-# 4. Instalamos las librerías de Python
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 5. Copiamos todo el contenido de tu proyecto al contenedor
+# 5. INSTALACIÓN CRÍTICA: Descargamos el navegador y las dependencias de sistema de Playwright
+# Esto instala Chromium y todas las librerías de Linux que necesita para correr en la nube
+RUN playwright install chromium
+RUN playwright install-deps chromium
+
+# 6. Copiamos el resto del código
 COPY . .
 
-# 6. Comando para ejecutar la API con Uvicorn
-# NOTA: Usamos "main:app" (módulo:variable), NO "main.py:app"
+# 7. Exponemos el puerto y lanzamos la app
+EXPOSE 10000
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "10000"]
